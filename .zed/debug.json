@@ -1,0 +1,13 @@
+[
+  {
+    "label": "Debug dbcli",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/target/debug/dbcli",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "build": {
+      "command": "cargo",
+      "args": ["build"]
+    }
+  }
+]
