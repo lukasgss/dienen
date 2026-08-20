@@ -1,15 +1,45 @@
-use core::fmt;
 use std::ffi::{CStr, CString};
 
 use crate::{
-    ConnStatusType, PGconn, PQconnectdb, PQerrorMessage, PQexec, PQfinish, PQgetvalue, PQntuples,
-    PQstatus,
+    ConnStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQerrorMessage, PQexec, PQfinish,
+    PQfname, PQftype, PQgetvalue, PQnfields, PQntuples, PQstatus, oid::Oid,
 };
 
-pub trait Database: fmt::Debug {
+pub(crate) enum PgType {
+    Bool,
+    Int2,
+    Int4,
+    Int8,
+    Float4,
+    Float8,
+    Text,
+    Unknown(Oid),
+}
+
+impl From<Oid> for PgType {
+    fn from(value: Oid) -> Self {
+        match value.0 {
+            16 => PgType::Bool,
+            23 => PgType::Int4,
+            25 | 1043 => PgType::Text,
+            other => PgType::Unknown(Oid(other)),
+        }
+    }
+}
+
+pub trait Database {
     fn connect(conn_str: impl Into<String>) -> Result<Box<dyn Database>, DatabaseError>
     where
         Self: Sized + Drop;
+
+    fn execute_query_statement(&self, query: &str) -> QueryResult;
+
+    fn connection(&self) -> *mut PGconn;
+}
+
+#[derive(Debug)]
+pub enum DatabaseError {
+    UnableToConnect(String),
 }
 
 #[derive(Debug)]
@@ -18,9 +48,19 @@ pub struct Postgres {
     tables: Vec<String>,
 }
 
-#[derive(Debug)]
-pub enum DatabaseError {
-    UnableToConnect(String),
+impl Postgres {
+    #[inline]
+    fn parse_boolean(&self, postgres_value: *mut i8) -> bool {
+        let byte: u8 = unsafe { *postgres_value } as u8;
+
+        byte == b't'
+    }
+}
+
+impl Drop for Postgres {
+    fn drop(&mut self) {
+        unsafe { PQfinish(self.connection) };
+    }
 }
 
 impl Database for Postgres {
@@ -61,10 +101,85 @@ impl Database for Postgres {
 
         Ok(Box::new(Postgres { connection, tables }))
     }
+
+    fn execute_query_statement(&self, query: &str) -> QueryResult {
+        let formatted_query =
+            CString::new(query).expect("should be able to create query from string");
+
+        let query_result = unsafe { PQexec(self.connection(), formatted_query.as_ptr()) };
+
+        let amount_cols = unsafe { PQnfields(query_result) };
+
+        let mut col_names = Vec::<String>::with_capacity(amount_cols as usize);
+        let mut col_types = Vec::<PgType>::with_capacity(amount_cols as usize);
+
+        for col in 0..amount_cols {
+            let col_name_ptr = unsafe { PQfname(query_result, col) };
+            let col_name = unsafe { CStr::from_ptr(col_name_ptr) }
+                .to_string_lossy()
+                .to_string();
+            col_names.push(col_name);
+
+            let oid = unsafe { PQftype(query_result, col) };
+            col_types.push(PgType::from(oid));
+        }
+
+        let amount_rows = unsafe { PQntuples(query_result) };
+        let mut rows = Vec::<Vec<Value>>::with_capacity(amount_rows as usize);
+
+        for row in 0..amount_rows {
+            let mut current_row = Vec::<Value>::with_capacity(amount_cols as usize);
+
+            for col in 0..amount_cols {
+                let value = unsafe { PQgetvalue(query_result, row, col) };
+
+                match &col_types[col as usize] {
+                    PgType::Bool => {
+                        let parsed_value = self.parse_boolean(value);
+                        current_row.push(Value::Bool(parsed_value));
+                    }
+                    PgType::Int2 => todo!(),
+                    PgType::Int4 => todo!(),
+                    PgType::Int8 => todo!(),
+                    PgType::Float4 => todo!(),
+                    PgType::Float8 => todo!(),
+                    PgType::Text => todo!(),
+                    PgType::Unknown(oid) => todo!(),
+                }
+            }
+
+            rows.push(current_row);
+        }
+
+        QueryResult {
+            cols: vec![],
+            rows: vec![],
+            result: query_result,
+        }
+    }
+
+    fn connection(&self) -> *mut PGconn {
+        self.connection
+    }
 }
 
-impl Drop for Postgres {
+pub enum Value {
+    Null,
+    Text(String),
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    Bytes(Vec<u8>),
+}
+
+pub struct QueryResult {
+    pub cols: Vec<String>,
+    pub rows: Vec<Value>,
+    result: *mut PGresult,
+}
+
+impl Drop for QueryResult {
     fn drop(&mut self) {
-        unsafe { PQfinish(self.connection) };
+        unsafe { PQclear(self.result) };
     }
 }

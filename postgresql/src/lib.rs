@@ -1,7 +1,9 @@
 extern crate libc;
 
+mod oid;
 pub mod postgres;
 
+use crate::oid::Oid;
 pub use crate::postgres::*;
 
 #[derive(Debug, PartialEq)]
@@ -72,6 +74,10 @@ unsafe extern "C" {
     pub fn PQntuples(result: *const PGresult) -> i32;
 
     pub fn PQnfields(result: *const PGresult) -> i32;
+
+    pub fn PQftype(result: *mut PGresult, field_num: i32) -> Oid;
+
+    pub fn PQfname(result: *const PGresult, column_number: i32) -> *const std::ffi::c_char;
 
     pub fn PQgetvalue(
         result: *const PGresult,
