@@ -2,7 +2,8 @@ use core::fmt;
 use std::ffi::{CStr, CString};
 
 use crate::{
-    ConnStatusType, PGconn, PQconnectdb, PQexec, PQfinish, PQgetvalue, PQntuples, PQstatus,
+    ConnStatusType, PGconn, PQconnectdb, PQerrorMessage, PQexec, PQfinish, PQgetvalue, PQntuples,
+    PQstatus,
 };
 
 pub trait Database: fmt::Debug {
@@ -19,7 +20,7 @@ pub struct Postgres {
 
 #[derive(Debug)]
 pub enum DatabaseError {
-    UnableToConnect,
+    UnableToConnect(String),
 }
 
 impl Database for Postgres {
@@ -30,7 +31,13 @@ impl Database for Postgres {
         let connection = unsafe { PQconnectdb(conn_str.as_ptr()) };
 
         if unsafe { PQstatus(connection) } != ConnStatusType::ConnectionOk {
-            return Err(DatabaseError::UnableToConnect);
+            let error_message_ptr = unsafe { PQerrorMessage(connection) };
+
+            let error_c_str = unsafe { CStr::from_ptr(error_message_ptr) };
+
+            return Err(DatabaseError::UnableToConnect(
+                error_c_str.to_string_lossy().into(),
+            ));
         }
 
         let tables_query = CString::new(
