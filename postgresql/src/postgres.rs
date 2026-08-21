@@ -1,7 +1,4 @@
-use std::{
-    error,
-    ffi::{CStr, CString},
-};
+use std::ffi::{CStr, CString};
 
 use crate::{
     ConnStatusType, ExecStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQerrorMessage, PQexec,

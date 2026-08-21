@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "pkg-config",
  "postgresql",
+ "ui",
 ]
 
 [[package]]
@@ -27,4 +28,11 @@ name = "postgresql"
 version = "0.1.0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "ui"
+version = "0.1.0"
+dependencies = [
+ "postgresql",
 ]

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 postgresql = { path = "./postgresql" }
+ui = { path = "./ui" }
 
 [build-dependencies]
 pkg-config = "0.3"
