@@ -1,8 +1,12 @@
-use std::ffi::{CStr, CString};
+use std::{
+    error,
+    ffi::{CStr, CString},
+};
 
 use crate::{
-    ConnStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQerrorMessage, PQexec, PQfinish,
-    PQfname, PQftype, PQgetisnull, PQgetvalue, PQnfields, PQntuples, PQstatus,
+    ConnStatusType, ExecStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQerrorMessage, PQexec,
+    PQfinish, PQfname, PQftype, PQgetisnull, PQgetvalue, PQnfields, PQntuples, PQresultStatus,
+    PQstatus,
     oid::{Oid, oid},
 };
 
@@ -46,6 +50,7 @@ pub trait Database {
 #[derive(Debug)]
 pub enum DatabaseError {
     UnableToConnect(String),
+    UnableToFetchDatabaseTables(String),
 }
 
 #[derive(Debug)]
@@ -115,6 +120,16 @@ impl Database for Postgres {
         .expect("should be able to create query");
 
         let tables_result = unsafe { PQexec(connection, tables_query.as_ptr()) };
+
+        if unsafe { PQresultStatus(tables_result) } != ExecStatusType::PgresTuplesOk {
+            let error_message_ptr = unsafe { PQerrorMessage(connection) };
+
+            let error_c_str = unsafe { CStr::from_ptr(error_message_ptr) };
+
+            return Err(DatabaseError::UnableToFetchDatabaseTables(
+                error_c_str.to_string_lossy().into(),
+            ));
+        }
 
         let amount_rows = unsafe { PQntuples(tables_result) };
 
