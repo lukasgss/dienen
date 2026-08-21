@@ -15,4 +15,4 @@ is PostgreSQL, MySQL or something else.
 
 ## Inspiration project
 
-This project is inspired on [pgcli](https://github.com/dbcli/pgcli), but written in Rust instead of Python
+This project is inspired on [pgcli](https://github.com/dbcli/pgcli) but with the goal of supporting multiple database providers and written in Rust instead of Python
