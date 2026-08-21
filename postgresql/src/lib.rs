@@ -77,6 +77,8 @@ unsafe extern "C" {
 
     pub fn PQftype(result: *mut PGresult, field_num: i32) -> Oid;
 
+    pub fn PQgetisnull(result: *const PGresult, row_number: i32, column_number: i32) -> i32;
+
     pub fn PQfname(result: *const PGresult, column_number: i32) -> *const std::ffi::c_char;
 
     pub fn PQgetvalue(

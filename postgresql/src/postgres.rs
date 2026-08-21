@@ -2,7 +2,7 @@ use std::ffi::{CStr, CString};
 
 use crate::{
     ConnStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQerrorMessage, PQexec, PQfinish,
-    PQfname, PQftype, PQgetvalue, PQnfields, PQntuples, PQstatus,
+    PQfname, PQftype, PQgetisnull, PQgetvalue, PQnfields, PQntuples, PQstatus,
     oid::{Oid, oid},
 };
 
@@ -120,8 +120,13 @@ impl Database for Postgres {
 
         let mut tables: Vec<String> = Vec::with_capacity(amount_rows as usize);
 
-        for i in 0..amount_rows {
-            let value = unsafe { PQgetvalue(tables_result, i, 0) };
+        for row_num in 0..amount_rows {
+            let value = unsafe { PQgetvalue(tables_result, row_num, 0) };
+
+            if unsafe { PQgetisnull(tables_result, row_num, 0) } == 1 {
+                tables.push("<null>".into());
+                continue;
+            }
 
             let value = unsafe { CStr::from_ptr(value) };
 
@@ -164,6 +169,11 @@ impl Database for Postgres {
 
             for col in 0..amount_cols {
                 let value = unsafe { PQgetvalue(query_result, row, col) };
+
+                if unsafe { PQgetisnull(query_result, row, col) } == 1 {
+                    current_row.push(Value::Null);
+                    continue;
+                }
 
                 match &cols[col as usize].pg_type {
                     PgType::Bool => {
