@@ -5,6 +5,7 @@ use crate::{
     PQfname, PQftype, PQgetvalue, PQnfields, PQntuples, PQstatus, oid::Oid,
 };
 
+#[derive(Debug)]
 pub(crate) enum PgType {
     Bool,
     Int2,
@@ -54,6 +55,29 @@ impl Postgres {
         let byte: u8 = unsafe { *postgres_value } as u8;
 
         byte == b't'
+    }
+
+    #[inline]
+    fn parse_int(&self, postgres_value: *mut i8) -> i64 {
+        let c_str = unsafe { CStr::from_ptr(postgres_value) };
+        let str = c_str.to_str().expect("integer should be valid utf-8");
+
+        str.parse::<i64>().expect("value should be valid integer")
+    }
+
+    #[inline]
+    fn parse_float(&self, postgres_value: *mut i8) -> f64 {
+        let c_str = unsafe { CStr::from_ptr(postgres_value) };
+        let str = c_str.to_str().expect("float value should be valid utf-8");
+
+        str.parse::<f64>().expect("value should be valid float")
+    }
+
+    #[inline]
+    fn parse_text(&self, postgres_value: *mut i8) -> String {
+        let c_str = unsafe { CStr::from_ptr(postgres_value) };
+
+        c_str.to_string_lossy().into()
     }
 }
 
@@ -110,18 +134,21 @@ impl Database for Postgres {
 
         let amount_cols = unsafe { PQnfields(query_result) };
 
-        let mut col_names = Vec::<String>::with_capacity(amount_cols as usize);
-        let mut col_types = Vec::<PgType>::with_capacity(amount_cols as usize);
+        let mut cols = Vec::<ColumnInfo>::with_capacity(amount_cols as usize);
 
         for col in 0..amount_cols {
             let col_name_ptr = unsafe { PQfname(query_result, col) };
             let col_name = unsafe { CStr::from_ptr(col_name_ptr) }
                 .to_string_lossy()
-                .to_string();
-            col_names.push(col_name);
+                .into();
 
             let oid = unsafe { PQftype(query_result, col) };
-            col_types.push(PgType::from(oid));
+            let col_info = ColumnInfo {
+                pg_type: PgType::from(oid),
+                name: col_name,
+            };
+
+            cols.push(col_info);
         }
 
         let amount_rows = unsafe { PQntuples(query_result) };
@@ -133,18 +160,24 @@ impl Database for Postgres {
             for col in 0..amount_cols {
                 let value = unsafe { PQgetvalue(query_result, row, col) };
 
-                match &col_types[col as usize] {
+                match &cols[col as usize].pg_type {
                     PgType::Bool => {
                         let parsed_value = self.parse_boolean(value);
                         current_row.push(Value::Bool(parsed_value));
                     }
-                    PgType::Int2 => todo!(),
-                    PgType::Int4 => todo!(),
-                    PgType::Int8 => todo!(),
-                    PgType::Float4 => todo!(),
-                    PgType::Float8 => todo!(),
-                    PgType::Text => todo!(),
-                    PgType::Unknown(oid) => todo!(),
+                    PgType::Int2 | PgType::Int4 | PgType::Int8 => {
+                        let parsed_value = self.parse_int(value);
+                        current_row.push(Value::Int(parsed_value));
+                    }
+                    PgType::Float4 | PgType::Float8 => {
+                        let parsed_value = self.parse_float(value);
+                        current_row.push(Value::Float(parsed_value));
+                    }
+                    PgType::Text => {
+                        let parsed_value = self.parse_text(value);
+                        current_row.push(Value::Text(parsed_value));
+                    }
+                    PgType::Unknown(_) => panic!("unknown types are not supported yet"),
                 }
             }
 
@@ -152,8 +185,8 @@ impl Database for Postgres {
         }
 
         QueryResult {
-            cols: vec![],
-            rows: vec![],
+            cols,
+            rows,
             result: query_result,
         }
     }
@@ -163,6 +196,7 @@ impl Database for Postgres {
     }
 }
 
+#[derive(Debug)]
 pub enum Value {
     Null,
     Text(String),
@@ -172,9 +206,16 @@ pub enum Value {
     Bytes(Vec<u8>),
 }
 
+#[derive(Debug)]
+pub struct ColumnInfo {
+    pg_type: PgType,
+    pub name: String,
+}
+
+#[derive(Debug)]
 pub struct QueryResult {
-    pub cols: Vec<String>,
-    pub rows: Vec<Value>,
+    pub cols: Vec<ColumnInfo>,
+    pub rows: Vec<Vec<Value>>,
     result: *mut PGresult,
 }
 
