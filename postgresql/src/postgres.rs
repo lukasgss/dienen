@@ -42,7 +42,7 @@ pub trait Database {
     where
         Self: Sized + Drop;
 
-    fn execute_query_statement(&self, query: &str) -> QueryResult;
+    fn execute_query_statement(&self, query: &str) -> Result<QueryResult, DatabaseError>;
 
     fn connection(&self) -> *mut PGconn;
 }
@@ -51,6 +51,7 @@ pub trait Database {
 pub enum DatabaseError {
     UnableToConnect(String),
     UnableToFetchDatabaseTables(String),
+    UnableToExecuteStatement(String),
 }
 
 #[derive(Debug)]
@@ -151,11 +152,21 @@ impl Database for Postgres {
         Ok(Box::new(Postgres { connection, tables }))
     }
 
-    fn execute_query_statement(&self, query: &str) -> QueryResult {
+    fn execute_query_statement(&self, query: &str) -> Result<QueryResult, DatabaseError> {
         let formatted_query =
             CString::new(query).expect("should be able to create query from string");
 
         let query_result = unsafe { PQexec(self.connection(), formatted_query.as_ptr()) };
+
+        if unsafe { PQresultStatus(query_result) } != ExecStatusType::PgresTuplesOk {
+            let error_message_ptr = unsafe { PQerrorMessage(self.connection()) };
+
+            let error_c_str = unsafe { CStr::from_ptr(error_message_ptr) };
+
+            return Err(DatabaseError::UnableToExecuteStatement(
+                error_c_str.to_string_lossy().into(),
+            ));
+        }
 
         let amount_cols = unsafe { PQnfields(query_result) };
 
@@ -214,11 +225,11 @@ impl Database for Postgres {
             rows.push(current_row);
         }
 
-        QueryResult {
+        Ok(QueryResult {
             cols,
             rows,
             result: query_result,
-        }
+        })
     }
 
     fn connection(&self) -> *mut PGconn {
