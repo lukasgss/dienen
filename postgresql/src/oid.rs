@@ -1,4 +1,4 @@
-mod oid {
+pub mod oid {
     pub const BOOL: u32 = 16;
     pub const BYTEA: u32 = 17;
     pub const INT8: u32 = 20;

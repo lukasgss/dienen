@@ -2,7 +2,8 @@ use std::ffi::{CStr, CString};
 
 use crate::{
     ConnStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQerrorMessage, PQexec, PQfinish,
-    PQfname, PQftype, PQgetvalue, PQnfields, PQntuples, PQstatus, oid::Oid,
+    PQfname, PQftype, PQgetvalue, PQnfields, PQntuples, PQstatus,
+    oid::{Oid, oid},
 };
 
 #[derive(Debug)]
@@ -20,9 +21,13 @@ pub(crate) enum PgType {
 impl From<Oid> for PgType {
     fn from(value: Oid) -> Self {
         match value.0 {
-            16 => PgType::Bool,
-            23 => PgType::Int4,
-            25 | 1043 => PgType::Text,
+            oid::BOOL => PgType::Bool,
+            oid::INT2 => PgType::Int2,
+            oid::INT4 => PgType::Int4,
+            oid::INT8 => PgType::Int8,
+            oid::FLOAT4 => PgType::Float4,
+            oid::FLOAT8 => PgType::Float8,
+            oid::TEXT | oid::VARCHAR => PgType::Text,
             other => PgType::Unknown(Oid(other)),
         }
     }
