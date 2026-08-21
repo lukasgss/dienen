@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "dbcli"
+name = "dienen"
 version = "0.1.0"
 dependencies = [
  "pkg-config",
