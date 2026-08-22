@@ -59,16 +59,17 @@ impl RowBuildingPhase {
 fn print_table_headers(columns: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
     for phase in RowBuildingPhase::ALL {
         match phase {
-            RowBuildingPhase::TopHeader => print_top_header_phase(columns, biggest_value_lens),
+            RowBuildingPhase::TopHeader | RowBuildingPhase::BottomHeader => {
+                print_top_or_bottom_header_phase(columns, biggest_value_lens)
+            }
             RowBuildingPhase::ColumnName => print_column_names_phase(columns, biggest_value_lens),
-            RowBuildingPhase::BottomHeader => {}
         }
     }
 
     _ = io::stdout().flush();
 }
 
-fn print_top_header_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
+fn print_top_or_bottom_header_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
     print!("+");
 
     for (idx, col) in cols.iter().enumerate() {
