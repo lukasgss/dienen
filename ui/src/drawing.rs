@@ -1,9 +1,11 @@
 use std::{
     borrow::Cow,
-    io::{self, Write},
+    io::{self, Error, Write},
 };
 
 use postgresql::{ColumnInfo, Value};
+
+use crate::phases::{HeaderDrawingPhase, RowDrawingPhase};
 
 const RESULT_PADDING: usize = 1;
 const TOTAL_PADDING_FOR_RESULT: usize = RESULT_PADDING * 2;
@@ -28,45 +30,39 @@ impl ValueExt for Value {
     }
 }
 
-pub fn draw_result(cols: &Vec<ColumnInfo>, rows: &Vec<Vec<Value>>) {
+pub fn draw_result(cols: &Vec<ColumnInfo>, rows: &Vec<Vec<Value>>) -> Result<(), Error> {
     let biggest_value_lengths_for_each_row = get_biggest_value_length_for_each_column(cols, rows);
 
     print_table_cols(cols, &biggest_value_lengths_for_each_row);
+    print_table_rows(&rows, &biggest_value_lengths_for_each_row);
+
+    io::stdout().flush()
 }
 
 fn print_table_cols(cols: &Vec<ColumnInfo>, lengths: &Vec<usize>) {
     print_table_headers(&cols, &lengths);
 }
 
-enum RowBuildingPhase {
-    TopHeader = 1,
-    ColumnName = 2,
-    BottomHeader = 3,
-}
-
-impl RowBuildingPhase {
-    // Amount of rows table header has, for example:
-    // +-------------+
-    // | Description |
-    // +-------------+
-    const HEADER_ROWS: u8 = 3;
-
-    const ALL: [Self; Self::HEADER_ROWS as usize] =
-        [Self::TopHeader, Self::ColumnName, Self::BottomHeader];
+#[inline]
+fn print_table_headers(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
+    for phase in HeaderDrawingPhase::ALL {
+        match phase {
+            HeaderDrawingPhase::TopHeader | HeaderDrawingPhase::BottomHeader => {
+                print_top_or_bottom_header_phase(cols, biggest_value_lens)
+            }
+            HeaderDrawingPhase::Value => print_column_names_phase(cols, biggest_value_lens),
+        }
+    }
 }
 
 #[inline]
-fn print_table_headers(columns: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
-    for phase in RowBuildingPhase::ALL {
+fn print_table_rows(rows: &Vec<Vec<Value>>, biggest_value_lens: &Vec<usize>) {
+    for phase in RowDrawingPhase::ROW {
         match phase {
-            RowBuildingPhase::TopHeader | RowBuildingPhase::BottomHeader => {
-                print_top_or_bottom_header_phase(columns, biggest_value_lens)
-            }
-            RowBuildingPhase::ColumnName => print_column_names_phase(columns, biggest_value_lens),
+            RowDrawingPhase::Value => todo!(),
+            RowDrawingPhase::BottomHeader => todo!(),
         }
     }
-
-    _ = io::stdout().flush();
 }
 
 fn print_top_or_bottom_header_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
@@ -91,7 +87,7 @@ fn print_column_names_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usi
     for (idx, col) in cols.iter().enumerate() {
         print!("|");
 
-        let width = biggest_value_lens[idx].max(col.name.len());
+        let width = biggest_value_lens[idx];
         let padding = width - col.name.chars().count();
         let left = padding / 2;
         let right = padding - left + 1;
@@ -102,6 +98,7 @@ fn print_column_names_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usi
     }
 
     print!("|");
+    print!("\n");
 }
 
 fn get_biggest_value_length_for_each_column(
@@ -110,7 +107,7 @@ fn get_biggest_value_length_for_each_column(
 ) -> Vec<usize> {
     let mut biggest_row_values = Vec::<usize>::with_capacity(col_info.len());
 
-    for (idx, _) in col_info.iter().enumerate() {
+    for (idx, col) in col_info.iter().enumerate() {
         let mut biggest_value_len: usize = 0;
 
         for value in rows {
@@ -119,6 +116,10 @@ fn get_biggest_value_length_for_each_column(
             if len > biggest_value_len {
                 biggest_value_len = len;
             }
+        }
+
+        if col.name.len() > biggest_value_len {
+            biggest_value_len = col.name.len();
         }
 
         biggest_row_values.push(biggest_value_len);
