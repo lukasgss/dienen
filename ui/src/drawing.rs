@@ -84,7 +84,7 @@ fn print_top_or_bottom_header_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: 
         print!("+");
     }
 
-    println!();
+    print!("\n");
 }
 
 fn print_column_names_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
@@ -101,7 +101,7 @@ fn print_column_names_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usi
         print!("{}", " ".repeat(right));
     }
 
-    println!("|");
+    print!("|");
 }
 
 fn get_biggest_value_length_for_each_column(
