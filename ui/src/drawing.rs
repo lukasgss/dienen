@@ -22,6 +22,7 @@ impl ValueExt for Value {
             Value::Bool(bool) => Cow::Owned(bool.to_string()),
             Value::Uuid(uuid) => Cow::Owned(uuid.to_string()),
             Value::Numeric(numeric) => Cow::Owned(numeric.to_string()),
+            Value::TimeStampTz(timestamp) => Cow::Owned(timestamp.to_string()),
             Value::Bytes(_) => todo!("find out what to do with this"),
         }
     }
@@ -34,45 +35,72 @@ pub fn draw_result(cols: &Vec<ColumnInfo>, rows: &Vec<Vec<Value>>) {
 }
 
 fn print_table_cols(cols: &Vec<ColumnInfo>, lengths: &Vec<usize>) {
-    for (idx, col) in cols.iter().enumerate() {
-        if idx == 0 {
-            print_first_line_table_header(&col.name, lengths[idx]);
-            continue;
-        }
+    print_table_headers(&cols, &lengths);
+}
 
-        print_col_name_header(lengths[idx]);
-    }
+enum RowBuildingPhase {
+    TopHeader = 1,
+    ColumnName = 2,
+    BottomHeader = 3,
+}
+
+impl RowBuildingPhase {
+    // Amount of rows table header has, for example:
+    // +-------------+
+    // | Description |
+    // +-------------+
+    const HEADER_ROWS: u8 = 3;
+
+    const ALL: [Self; Self::HEADER_ROWS as usize] =
+        [Self::TopHeader, Self::ColumnName, Self::BottomHeader];
 }
 
 #[inline]
-fn print_first_line_table_header(col_name: &str, biggest_value_len: usize) {
-    // 1st row
-    print!("+");
-    print!(
-        "{}",
-        "-".repeat(biggest_value_len + TOTAL_PADDING_FOR_RESULT)
-    );
-    println!("+");
-
-    // 2nd row
-    print!("|");
-    print!(" {} ", col_name);
-    print!("|");
-
-    // 3nd row
-    print!("+");
-    print!(
-        "{}",
-        "-".repeat(biggest_value_len + TOTAL_PADDING_FOR_RESULT)
-    );
-    println!("+");
+fn print_table_headers(columns: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
+    for phase in RowBuildingPhase::ALL {
+        match phase {
+            RowBuildingPhase::TopHeader => print_top_header_phase(columns, biggest_value_lens),
+            RowBuildingPhase::ColumnName => print_column_names_phase(columns, biggest_value_lens),
+            RowBuildingPhase::BottomHeader => {}
+        }
+    }
 
     _ = io::stdout().flush();
 }
 
-#[inline]
-fn print_col_name_header(length: usize) {
-    print!("|");
+fn print_top_header_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
+    print!("+");
+
+    for (idx, col) in cols.iter().enumerate() {
+        let col_biggest_value = biggest_value_lens[idx];
+
+        if col_biggest_value > col.name.len() {
+            print!("{}", "-".repeat(col_biggest_value + 2));
+        } else {
+            print!("{}", "-".repeat(col.name.len() + 2));
+        }
+
+        print!("+");
+    }
+
+    println!();
+}
+
+fn print_column_names_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
+    for (idx, col) in cols.iter().enumerate() {
+        print!("|");
+
+        let width = biggest_value_lens[idx].max(col.name.len());
+        let padding = width - col.name.chars().count();
+        let left = padding / 2;
+        let right = padding - left + 1;
+
+        print!("{}", " ".repeat(left + 1));
+        print!("{}", col.name);
+        print!("{}", " ".repeat(right));
+    }
+
+    println!("|");
 }
 
 fn get_biggest_value_length_for_each_column(
@@ -84,11 +112,11 @@ fn get_biggest_value_length_for_each_column(
     for (idx, _) in col_info.iter().enumerate() {
         let mut biggest_value_len: usize = 0;
 
-        for row in &rows[idx] {
-            let str_value = row.as_str();
+        for value in rows {
+            let len = value[idx].as_str().len();
 
-            if str_value.len() > biggest_value_len {
-                biggest_value_len = str_value.len();
+            if len > biggest_value_len {
+                biggest_value_len = len;
             }
         }
 

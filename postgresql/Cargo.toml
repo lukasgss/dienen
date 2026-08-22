@@ -7,3 +7,4 @@ edition = "2024"
 libc = "0.2.189"
 uuid = { version = "1.25.0", features = ["v4", "v7"] }
 rust_decimal = "1.42.1"
+chrono = "0.4.45"

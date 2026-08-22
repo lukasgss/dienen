@@ -1,5 +1,6 @@
 use std::ffi::{CStr, CString};
 
+use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal::{self, Decimal};
 use uuid::Uuid;
 
@@ -21,6 +22,7 @@ pub(crate) enum PgType {
     Text,
     Uuid,
     Numeric,
+    TimeStampTz,
     Unknown(Oid),
 }
 
@@ -36,6 +38,7 @@ impl From<Oid> for PgType {
             oid::TEXT | oid::VARCHAR => PgType::Text,
             oid::UUID => PgType::Uuid,
             oid::NUMERIC => PgType::Numeric,
+            oid::TIMESTAMPTZ => PgType::TimeStampTz,
             other => PgType::Unknown(Oid(other)),
         }
     }
@@ -115,6 +118,13 @@ impl Postgres {
         let decimal: Decimal = str.parse().expect("should be valid decimal value");
 
         decimal
+    }
+
+    #[inline]
+    fn parse_time_stamp_tz(&self, postgres_value: *mut i8) -> String {
+        let c_str = unsafe { CStr::from_ptr(postgres_value) };
+
+        c_str.to_string_lossy().to_string()
     }
 }
 
@@ -252,6 +262,10 @@ impl Database for Postgres {
                         let parsed_value = self.parse_numeric(value);
                         current_row.push(Value::Numeric(parsed_value));
                     }
+                    PgType::TimeStampTz => {
+                        let parsed_value = self.parse_time_stamp_tz(value);
+                        current_row.push(Value::TimeStampTz(parsed_value));
+                    }
                     PgType::Unknown(oid) => {
                         println!("unknown oid: {:?}", oid);
                         panic!("unknown types are not supported yet");
@@ -284,6 +298,7 @@ pub enum Value {
     Bytes(Vec<u8>),
     Uuid(Uuid),
     Numeric(Decimal),
+    TimeStampTz(String),
 }
 
 #[derive(Debug)]
