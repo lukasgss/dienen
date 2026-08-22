@@ -76,7 +76,7 @@ fn print_table_rows(rows: &Vec<Vec<Value>>, biggest_value_lens: &Vec<usize>) {
 fn print_bottom_header_phase_rows(row: &Vec<Value>, biggest_value_lens: &Vec<usize>) {
     print!("+");
 
-    for (idx, _) in row.iter().enumerate() {
+    for idx in 0..row.len() {
         let biggest_value = biggest_value_lens[idx];
 
         print!("{}", "-".repeat(biggest_value + TOTAL_PADDING_FOR_RESULT));
@@ -90,7 +90,7 @@ fn print_bottom_header_phase_rows(row: &Vec<Value>, biggest_value_lens: &Vec<usi
 fn print_top_or_bottom_header_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
     print!("+");
 
-    for (idx, _) in cols.iter().enumerate() {
+    for idx in 0..cols.len() {
         let len_biggest_value = biggest_value_lens[idx];
 
         print!("{}", "-".repeat(len_biggest_value + 2));
@@ -102,10 +102,10 @@ fn print_top_or_bottom_header_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: 
 }
 
 fn print_column_names_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
-    for (idx, col) in cols.iter().enumerate() {
+    for (col, biggest_value) in cols.iter().zip(biggest_value_lens) {
         print!("|");
 
-        print_centered_text(&col.name, biggest_value_lens[idx]);
+        print_centered_text(&col.name, *biggest_value);
     }
 
     print!("|");
@@ -116,20 +116,18 @@ fn print_row_values(rows: &Vec<Vec<Value>>, biggest_value_lens: &Vec<usize>) {
     for i in 0..rows.len() {
         print!("|");
 
-        for (col_idx, value) in rows[i].iter().enumerate() {
-            let biggest_value_len = biggest_value_lens[col_idx];
-
+        for (value, biggest_value_len) in rows[i].iter().zip(biggest_value_lens) {
             match value {
-                Value::Null => print_centered_text("<null>", biggest_value_len),
-                Value::Text(text) => print_centered_text(&text, biggest_value_len),
-                Value::Int(int) => print_centered_text(&int.to_string(), biggest_value_len),
-                Value::Float(float) => print_centered_text(&float.to_string(), biggest_value_len),
-                Value::Bool(bool) => print_centered_text(&bool.to_string(), biggest_value_len),
-                Value::Uuid(uuid) => print_centered_text(&uuid.to_string(), biggest_value_len),
+                Value::Null => print_centered_text("<null>", *biggest_value_len),
+                Value::Text(text) => print_centered_text(&text, *biggest_value_len),
+                Value::Int(int) => print_centered_text(&int.to_string(), *biggest_value_len),
+                Value::Float(float) => print_centered_text(&float.to_string(), *biggest_value_len),
+                Value::Bool(bool) => print_centered_text(&bool.to_string(), *biggest_value_len),
+                Value::Uuid(uuid) => print_centered_text(&uuid.to_string(), *biggest_value_len),
                 Value::Numeric(decimal) => {
-                    print_centered_text(&decimal.to_string(), biggest_value_len)
+                    print_centered_text(&decimal.to_string(), *biggest_value_len)
                 }
-                Value::TimeStampTz(timestamp) => print_centered_text(timestamp, biggest_value_len),
+                Value::TimeStampTz(timestamp) => print_centered_text(timestamp, *biggest_value_len),
                 Value::Bytes(_) => todo!("find out what to do with this"),
             }
 
