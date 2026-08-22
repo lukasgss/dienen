@@ -1,5 +1,8 @@
 use std::ffi::{CStr, CString};
 
+use rust_decimal::{self, Decimal};
+use uuid::Uuid;
+
 use crate::{
     ConnStatusType, ExecStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQerrorMessage, PQexec,
     PQfinish, PQfname, PQftype, PQgetisnull, PQgetvalue, PQnfields, PQntuples, PQresultStatus,
@@ -16,6 +19,8 @@ pub(crate) enum PgType {
     Float4,
     Float8,
     Text,
+    Uuid,
+    Numeric,
     Unknown(Oid),
 }
 
@@ -29,6 +34,8 @@ impl From<Oid> for PgType {
             oid::FLOAT4 => PgType::Float4,
             oid::FLOAT8 => PgType::Float8,
             oid::TEXT | oid::VARCHAR => PgType::Text,
+            oid::UUID => PgType::Uuid,
+            oid::NUMERIC => PgType::Numeric,
             other => PgType::Unknown(Oid(other)),
         }
     }
@@ -86,6 +93,28 @@ impl Postgres {
         let c_str = unsafe { CStr::from_ptr(postgres_value) };
 
         c_str.to_string_lossy().into()
+    }
+
+    #[inline]
+    fn parse_uuid(&self, postgres_value: *mut i8) -> Uuid {
+        let c_str = unsafe { CStr::from_ptr(postgres_value) };
+
+        let str = c_str.to_str().expect("uuid value should be valid utf-8");
+
+        let uuid = Uuid::parse_str(str).expect("uuid value should be valid Uuid");
+
+        uuid
+    }
+
+    #[inline]
+    fn parse_numeric(&self, postgres_value: *mut i8) -> Decimal {
+        let c_str = unsafe { CStr::from_ptr(postgres_value) };
+
+        let str = c_str.to_str().expect("numeric value should be valid utf-8");
+
+        let decimal: Decimal = str.parse().expect("should be valid decimal value");
+
+        decimal
     }
 }
 
@@ -215,7 +244,18 @@ impl Database for Postgres {
                         let parsed_value = self.parse_text(value);
                         current_row.push(Value::Text(parsed_value));
                     }
-                    PgType::Unknown(_) => panic!("unknown types are not supported yet"),
+                    PgType::Uuid => {
+                        let parsed_value = self.parse_uuid(value);
+                        current_row.push(Value::Uuid(parsed_value));
+                    }
+                    PgType::Numeric => {
+                        let parsed_value = self.parse_numeric(value);
+                        current_row.push(Value::Numeric(parsed_value));
+                    }
+                    PgType::Unknown(oid) => {
+                        println!("unknown oid: {:?}", oid);
+                        panic!("unknown types are not supported yet");
+                    }
                 }
             }
 
@@ -242,6 +282,8 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     Bytes(Vec<u8>),
+    Uuid(Uuid),
+    Numeric(Decimal),
 }
 
 #[derive(Debug)]

@@ -6,7 +6,7 @@ fn main() {
 
     let postgres = postgres.unwrap();
     let result = postgres
-        .execute_query_statement("select version();")
+        .execute_query_statement("select * from \"MedicalBillItem\";")
         .unwrap();
 
     draw_result(&result.cols, &result.rows);
