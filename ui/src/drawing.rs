@@ -34,7 +34,7 @@ pub fn draw_result(cols: &Vec<ColumnInfo>, rows: &Vec<Vec<Value>>) -> Result<(),
     let biggest_value_lengths_for_each_row = get_biggest_value_length_for_each_column(cols, rows);
 
     print_table_cols(cols, &biggest_value_lengths_for_each_row);
-    print_table_rows(&rows, &biggest_value_lengths_for_each_row);
+    print_table_rows(rows, &biggest_value_lengths_for_each_row);
 
     io::stdout().flush()
 }
@@ -59,23 +59,41 @@ fn print_table_headers(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) 
 fn print_table_rows(rows: &Vec<Vec<Value>>, biggest_value_lens: &Vec<usize>) {
     for phase in RowDrawingPhase::ROW {
         match phase {
-            RowDrawingPhase::Value => todo!(),
-            RowDrawingPhase::BottomHeader => todo!(),
+            RowDrawingPhase::Value => print_row_values(rows, biggest_value_lens),
+            RowDrawingPhase::BottomHeader => {
+                for (idx, row) in rows.iter().enumerate() {
+                    if idx == rows.len() - 1 {
+                        break;
+                    }
+
+                    print_bottom_header_phase_rows(row, biggest_value_lens);
+                }
+            }
         }
     }
+}
+
+fn print_bottom_header_phase_rows(row: &Vec<Value>, biggest_value_lens: &Vec<usize>) {
+    print!("+");
+
+    for (idx, _) in row.iter().enumerate() {
+        let biggest_value = biggest_value_lens[idx];
+
+        print!("{}", "-".repeat(biggest_value + TOTAL_PADDING_FOR_RESULT));
+
+        print!("+");
+    }
+
+    print!("\n");
 }
 
 fn print_top_or_bottom_header_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usize>) {
     print!("+");
 
-    for (idx, col) in cols.iter().enumerate() {
-        let col_biggest_value = biggest_value_lens[idx];
+    for (idx, _) in cols.iter().enumerate() {
+        let len_biggest_value = biggest_value_lens[idx];
 
-        if col_biggest_value > col.name.len() {
-            print!("{}", "-".repeat(col_biggest_value + 2));
-        } else {
-            print!("{}", "-".repeat(col.name.len() + 2));
-        }
+        print!("{}", "-".repeat(len_biggest_value + 2));
 
         print!("+");
     }
@@ -87,18 +105,49 @@ fn print_column_names_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usi
     for (idx, col) in cols.iter().enumerate() {
         print!("|");
 
-        let width = biggest_value_lens[idx];
-        let padding = width - col.name.chars().count();
-        let left = padding / 2;
-        let right = padding - left + 1;
-
-        print!("{}", " ".repeat(left + 1));
-        print!("{}", col.name);
-        print!("{}", " ".repeat(right));
+        print_centered_text(&col.name, biggest_value_lens[idx]);
     }
 
     print!("|");
     print!("\n");
+}
+
+fn print_row_values(rows: &Vec<Vec<Value>>, biggest_value_lens: &Vec<usize>) {
+    for i in 0..rows.len() {
+        print!("|");
+
+        for (col_idx, value) in rows[i].iter().enumerate() {
+            let biggest_value_len = biggest_value_lens[col_idx];
+
+            match value {
+                Value::Null => print_centered_text("<null>", biggest_value_len),
+                Value::Text(text) => print_centered_text(&text, biggest_value_len),
+                Value::Int(int) => print_centered_text(&int.to_string(), biggest_value_len),
+                Value::Float(float) => print_centered_text(&float.to_string(), biggest_value_len),
+                Value::Bool(bool) => print_centered_text(&bool.to_string(), biggest_value_len),
+                Value::Uuid(uuid) => print_centered_text(&uuid.to_string(), biggest_value_len),
+                Value::Numeric(decimal) => {
+                    print_centered_text(&decimal.to_string(), biggest_value_len)
+                }
+                Value::TimeStampTz(timestamp) => print_centered_text(timestamp, biggest_value_len),
+                Value::Bytes(_) => todo!("find out what to do with this"),
+            }
+
+            print!("|");
+        }
+
+        print!("\n");
+    }
+}
+
+fn print_centered_text(text: &str, total_width: usize) {
+    let padding = total_width.saturating_sub(text.chars().count());
+    let left = padding / 2;
+    let right = padding - left;
+
+    print!("{}", " ".repeat(left + 1));
+    print!("{}", text);
+    print!("{}", " ".repeat(right + 1));
 }
 
 fn get_biggest_value_length_for_each_column(
@@ -111,15 +160,15 @@ fn get_biggest_value_length_for_each_column(
         let mut biggest_value_len: usize = 0;
 
         for value in rows {
-            let len = value[idx].as_str().len();
+            let len = value[idx].as_str().chars().count();
 
             if len > biggest_value_len {
                 biggest_value_len = len;
             }
         }
 
-        if col.name.len() > biggest_value_len {
-            biggest_value_len = col.name.len();
+        if col.name.chars().count() > biggest_value_len {
+            biggest_value_len = col.name.chars().count();
         }
 
         biggest_row_values.push(biggest_value_len);
