@@ -81,6 +81,8 @@ unsafe extern "C" {
 
     pub fn PQfname(result: *const PGresult, column_number: i32) -> *const std::ffi::c_char;
 
+    pub fn PQdb(conn: *const PGconn) -> *const std::ffi::c_char;
+
     pub fn PQgetvalue(
         result: *const PGresult,
         row_number: i32,
