@@ -1,13 +1,12 @@
 use std::ffi::{CStr, CString};
 
-use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal::{self, Decimal};
 use uuid::Uuid;
 
 use crate::{
-    ConnStatusType, ExecStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQerrorMessage, PQexec,
-    PQfinish, PQfname, PQftype, PQgetisnull, PQgetvalue, PQnfields, PQntuples, PQresultStatus,
-    PQstatus,
+    ConnStatusType, ExecStatusType, PGconn, PGresult, PQclear, PQconnectdb, PQdb, PQerrorMessage,
+    PQexec, PQfinish, PQfname, PQftype, PQgetisnull, PQgetvalue, PQnfields, PQntuples,
+    PQresultStatus, PQstatus,
     oid::{Oid, oid},
 };
 
@@ -52,6 +51,10 @@ pub trait Database {
     fn execute_query_statement(&self, query: &str) -> Result<QueryResult, DatabaseError>;
 
     fn connection(&self) -> *mut PGconn;
+
+    fn database_name(&self) -> &str;
+
+    fn error_message(&self) -> String;
 }
 
 #[derive(Debug)]
@@ -65,6 +68,7 @@ pub enum DatabaseError {
 pub struct Postgres {
     pub connection: *mut PGconn,
     tables: Vec<String>,
+    database_name: String,
 }
 
 impl Postgres {
@@ -151,6 +155,11 @@ impl Database for Postgres {
             ));
         }
 
+        let database_name_ptr = unsafe { PQdb(connection) };
+        let database_name = unsafe { CStr::from_ptr(database_name_ptr) }
+            .to_string_lossy()
+            .to_string();
+
         let tables_query = CString::new(
             "select table_name from information_schema.tables where table_schema = 'public';",
         )
@@ -185,7 +194,11 @@ impl Database for Postgres {
             tables.push(value.to_string_lossy().to_string());
         }
 
-        Ok(Box::new(Postgres { connection, tables }))
+        Ok(Box::new(Postgres {
+            connection,
+            tables,
+            database_name,
+        }))
     }
 
     fn execute_query_statement(&self, query: &str) -> Result<QueryResult, DatabaseError> {
@@ -285,6 +298,20 @@ impl Database for Postgres {
 
     fn connection(&self) -> *mut PGconn {
         self.connection
+    }
+
+    fn database_name(&self) -> &str {
+        &self.database_name
+    }
+
+    fn error_message(&self) -> String {
+        let error_message_ptr = unsafe { PQerrorMessage(self.connection) };
+
+        let error_message = unsafe { CStr::from_ptr(error_message_ptr) }
+            .to_string_lossy()
+            .to_string();
+
+        error_message
     }
 }
 
