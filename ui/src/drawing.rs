@@ -1,8 +1,10 @@
 use std::{
     borrow::Cow,
     io::{self, Error, Write},
+    str::FromStr,
 };
 
+use colored::{ColoredString, Colorize};
 use postgresql::{ColumnInfo, Value};
 
 use crate::phases::{HeaderDrawingPhase, RowDrawingPhase};
@@ -105,7 +107,7 @@ fn print_column_names_phase(cols: &Vec<ColumnInfo>, biggest_value_lens: &Vec<usi
     for (col, biggest_value) in cols.iter().zip(biggest_value_lens) {
         print!("|");
 
-        print_centered_text(&col.name, *biggest_value);
+        print_centered_text(&col.name, *biggest_value, Color::Default);
     }
 
     print!("|");
@@ -118,16 +120,28 @@ fn print_row_values(rows: &Vec<Vec<Value>>, biggest_value_lens: &Vec<usize>) {
 
         for (value, biggest_value_len) in rows[i].iter().zip(biggest_value_lens) {
             match value {
-                Value::Null => print_centered_text("<null>", *biggest_value_len),
-                Value::Text(text) => print_centered_text(&text, *biggest_value_len),
-                Value::Int(int) => print_centered_text(&int.to_string(), *biggest_value_len),
-                Value::Float(float) => print_centered_text(&float.to_string(), *biggest_value_len),
-                Value::Bool(bool) => print_centered_text(&bool.to_string(), *biggest_value_len),
-                Value::Uuid(uuid) => print_centered_text(&uuid.to_string(), *biggest_value_len),
-                Value::Numeric(decimal) => {
-                    print_centered_text(&decimal.to_string(), *biggest_value_len)
+                Value::Null => {
+                    print_centered_text("<null>", *biggest_value_len, Color::BrightYellow)
                 }
-                Value::TimeStampTz(timestamp) => print_centered_text(timestamp, *biggest_value_len),
+                Value::Text(text) => print_centered_text(&text, *biggest_value_len, Color::Green),
+                Value::Int(int) => {
+                    print_centered_text(&int.to_string(), *biggest_value_len, Color::Orange)
+                }
+                Value::Float(float) => {
+                    print_centered_text(&float.to_string(), *biggest_value_len, Color::Orange)
+                }
+                Value::Bool(bool) => {
+                    print_centered_text(&bool.to_string(), *biggest_value_len, Color::Purple)
+                }
+                Value::Uuid(uuid) => {
+                    print_centered_text(&uuid.to_string(), *biggest_value_len, Color::Purple)
+                }
+                Value::Numeric(decimal) => {
+                    print_centered_text(&decimal.to_string(), *biggest_value_len, Color::Orange)
+                }
+                Value::TimeStampTz(timestamp) => {
+                    print_centered_text(timestamp, *biggest_value_len, Color::Blue)
+                }
                 Value::Bytes(_) => todo!("find out what to do with this"),
             }
 
@@ -138,13 +152,50 @@ fn print_row_values(rows: &Vec<Vec<Value>>, biggest_value_lens: &Vec<usize>) {
     }
 }
 
-fn print_centered_text(text: &str, total_width: usize) {
+enum ColorError {
+    InvalidColor,
+}
+
+enum Color {
+    Default,
+    Green,
+    BrightYellow,
+    Yellow,
+    Orange,
+    Blue,
+    Purple,
+}
+
+impl FromStr for Color {
+    type Err = ColorError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "yellow" => Ok(Color::Yellow),
+            "green" => Ok(Color::Green),
+            _ => Err(ColorError::InvalidColor),
+        }
+    }
+}
+
+fn print_centered_text(text: &str, total_width: usize, color: Color) {
     let padding = total_width.saturating_sub(text.chars().count());
     let left = padding / 2;
     let right = padding - left;
 
+    let colored_text: ColoredString;
+    match color {
+        Color::Default => colored_text = text.normal(),
+        Color::Green => colored_text = text.truecolor(96, 230, 103),
+        Color::BrightYellow => colored_text = text.truecolor(255, 215, 0),
+        Color::Yellow => colored_text = text.truecolor(238, 207, 160),
+        Color::Orange => colored_text = text.truecolor(240, 192, 168),
+        Color::Blue => colored_text = text.truecolor(143, 199, 255),
+        Color::Purple => colored_text = text.truecolor(210, 204, 255),
+    }
+
     print!("{}", " ".repeat(left + 1));
-    print!("{}", text);
+    print!("{}", colored_text);
     print!("{}", " ".repeat(right + 1));
 }
 
