@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 # TODO: remove this dependency and have these in some sort of common crate that all providers share
 postgresql = { path = "../postgresql" }
+rustyline = "18.0.1"

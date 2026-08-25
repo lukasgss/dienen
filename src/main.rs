@@ -1,24 +1,12 @@
-use postgresql::{self, Database, Postgres};
-use ui::{drawing::draw_result, input::ask_input};
+use postgresql::{Database, Postgres};
+use ui::repl;
 
 fn main() {
     let postgres =
-        Postgres::connect("host=localhost user=postgres dbname=timeline password=123456");
+        Postgres::connect("host=localhost user=postgres dbname=timeline password=123456")
+            .expect("should be able to connect to the database");
 
-    let postgres = postgres.unwrap();
-
-    loop {
-        let query = ask_input(postgres.database_name());
-
-        let query_result = postgres.execute_query_statement(&query);
-
-        match query_result {
-            Ok(result) => {
-                if let Err(drawing_result) = draw_result(&result.cols, &result.rows) {
-                    println!("{}", drawing_result);
-                }
-            }
-            Err(_) => println!("{}", postgres.error_message()),
-        }
+    if let Err(err) = repl::run(postgres.as_ref()) {
+        eprintln!("error: {err:?}");
     }
 }

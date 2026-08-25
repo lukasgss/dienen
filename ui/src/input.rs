@@ -1,14 +1,36 @@
-use std::io::{self, Write, stdout};
+use rustyline::{DefaultEditor, error::ReadlineError};
 
-pub fn ask_input(database_name: &str) -> String {
-    print!("{}> ", database_name);
+pub enum Input {
+    Line(String),
+    Interrupted,
+    Eof,
+}
 
-    let _ = stdout().flush();
+pub struct Prompt {
+    editor: DefaultEditor,
+    prompt: String,
+}
 
-    let mut input_query = String::new();
-    io::stdin()
-        .read_line(&mut input_query)
-        .expect("should be able to parse input query");
+impl Prompt {
+    pub fn new(database_name: &str) -> Result<Self, ReadlineError> {
+        Ok(Self {
+            editor: DefaultEditor::new()?,
+            prompt: format!("{database_name}> "),
+        })
+    }
 
-    input_query
+    pub fn ask(&mut self) -> Result<Input, ReadlineError> {
+        match self.editor.readline(&self.prompt) {
+            Ok(line) => {
+                if !line.trim().is_empty() {
+                    self.editor.add_history_entry(&line)?;
+                }
+
+                Ok(Input::Line(line))
+            }
+            Err(ReadlineError::Interrupted) => Ok(Input::Interrupted),
+            Err(ReadlineError::Eof) => Ok(Input::Eof),
+            Err(err) => Err(err),
+        }
+    }
 }
