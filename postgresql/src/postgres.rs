@@ -1,5 +1,6 @@
 use std::ffi::{CStr, CString};
 
+use libc::TCP_QUICKACK;
 use rust_decimal::{self, Decimal};
 use uuid::Uuid;
 
@@ -55,6 +56,8 @@ pub trait Database {
     fn database_name(&self) -> &str;
 
     fn error_message(&self) -> String;
+
+    fn quit_commands(&self) -> &[&'static str; 3];
 }
 
 #[derive(Debug)]
@@ -69,9 +72,12 @@ pub struct Postgres {
     pub connection: *mut PGconn,
     tables: Vec<String>,
     database_name: String,
+    quit_commands: [&'static str; 3],
 }
 
 impl Postgres {
+    const QUIT_COMMANDS: [&'static str; 3] = ["exit", "quit", "\\q"];
+
     #[inline]
     fn parse_boolean(&self, postgres_value: *mut i8) -> bool {
         let byte: u8 = unsafe { *postgres_value } as u8;
@@ -198,6 +204,7 @@ impl Database for Postgres {
             connection,
             tables,
             database_name,
+            quit_commands: Postgres::QUIT_COMMANDS,
         }))
     }
 
@@ -312,6 +319,10 @@ impl Database for Postgres {
             .to_string();
 
         error_message
+    }
+
+    fn quit_commands(&self) -> &[&'static str; 3] {
+        &self.quit_commands
     }
 }
 

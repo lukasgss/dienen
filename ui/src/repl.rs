@@ -10,9 +10,16 @@ pub fn run(database: &dyn Database) -> Result<(), ReadlineError> {
     loop {
         match prompt.ask()? {
             Input::Line(query) => {
-                if !query.trim().is_empty() {
-                    execute(database, &query);
+                let trimmed_query = query.trim();
+                if trimmed_query.is_empty() {
+                    continue;
                 }
+
+                if database.quit_commands().contains(&trimmed_query) {
+                    break;
+                }
+
+                execute(database, &query);
             }
             Input::Interrupted | Input::Eof => break,
         }
