@@ -1,4 +1,6 @@
-use rustyline::{DefaultEditor, error::ReadlineError};
+use rustyline::{Editor, error::ReadlineError, history::DefaultHistory};
+
+use crate::highlight::SqlHighlighter;
 
 pub enum Input {
     Line(String),
@@ -7,14 +9,17 @@ pub enum Input {
 }
 
 pub struct Prompt {
-    editor: DefaultEditor,
+    editor: Editor<SqlHighlighter, DefaultHistory>,
     prompt: String,
 }
 
 impl Prompt {
     pub fn new(database_name: &str) -> Result<Self, ReadlineError> {
+        let mut editor = Editor::new()?;
+        editor.set_helper(Some(SqlHighlighter));
+
         Ok(Self {
-            editor: DefaultEditor::new()?,
+            editor,
             prompt: format!("{database_name}> "),
         })
     }

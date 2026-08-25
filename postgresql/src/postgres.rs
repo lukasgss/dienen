@@ -1,6 +1,5 @@
 use std::ffi::{CStr, CString};
 
-use libc::TCP_QUICKACK;
 use rust_decimal::{self, Decimal};
 use uuid::Uuid;
 
